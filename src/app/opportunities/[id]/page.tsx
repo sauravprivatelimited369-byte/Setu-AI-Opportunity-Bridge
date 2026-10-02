@@ -1,265 +1,43 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import {
-  ArrowLeft,
-  BookmarkCheck,
-  BookmarkPlus,
-  Building2,
-  CheckCircle2,
-  ExternalLink,
-  Lightbulb,
-  MapPin,
-  ShieldCheck,
-  Sparkles,
-  Target,
-} from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, MapPin, Briefcase, GraduationCap, Building2, Calendar, Percent, CheckCircle2, Sparkles, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react";
+import clsx from "clsx";
 import { useLang } from "@/context/LangContext";
-import { useT, pickLocalized } from "@/lib/i18n";
-import type { EligibilityCheck } from "@/lib/eligibility";
-import { statusLabel } from "@/lib/eligibility";
-import type { MatchResult, Opportunity } from "@/lib/types";
+import type { Opportunity, MatchResult, Application } from "@/lib/types";
+import ShareButtons from "@/components/ShareButtons";
+import Confetti from "@/components/Confetti";
 
-export default function OpportunityDetail() {
-  const { lang } = useLang();
-  const t = useT(lang);
-  const params = useParams();
-  const id = params?.id as string;
-
-  const [opp, setOpp] = useState<Opportunity | null>(null);
-  const [match, setMatch] = useState<MatchResult | null>(null);
-  const [eligibility, setEligibility] = useState<EligibilityCheck | null>(null);
-  const [applying, setApplying] = useState(false);
-  const [appliedResult, setAppliedResult] = useState<{ score: number; feedback: string } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!id) return;
-    fetch(`/api/opportunities/${id}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setOpp(d.opportunity);
-        setMatch(d.match);
-        setEligibility(d.eligibility ?? null);
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  const handleSave = async () => {
-    if (!opp) return;
-    const r = await fetch("/api/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ opportunityId: opp.id }),
-    });
-    const d = await r.json();
-    setOpp({ ...opp, saved: d.saved });
-  };
-
-  const handleApply = async () => {
-    if (!opp || opp.applied) return;
-    setApplying(true);
-    const r = await fetch("/api/apply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ opportunityId: opp.id }),
-    });
-    const d = await r.json();
-    setOpp({ ...opp, applied: true });
-    setAppliedResult(d.ai);
-    setApplying(false);
-  };
-
-  if (loading) {
-    return <div className="max-w-4xl mx-auto p-6">{lang === "hi" ? "लोड हो रहा है…" : "Loading…"}</div>;
-  }
-  if (!opp) {
-    return (
-      <div className="max-w-4xl mx-auto p-6">
-        <p>{lang === "hi" ? "अवसर नहीं मिला।" : "Opportunity not found."}</p>
-        <Link href="/opportunities" className="text-setu-700 underline">{t.back}</Link>
+export default function OpportunityDetail(){
+  const params=useParams();const id=params.id as string;const router=useRouter();const{lang}=useLang();const hi=lang==="hi";
+  const[opp,setOpp]=useState<Opportunity|null>(null);const[match,setMatch]=useState<MatchResult|null>(null);const[applied,setApplied]=useState<Application|null>(null);const[applying,setApplying]=useState(false);const[err,setErr]=useState<string|null>(null);const[fire,setFire]=useState(false);
+  useEffect(()=>{(async()=>{try{const r=await fetch(`/api/opportunities/${id}`);if(!r.ok)throw new Error("not found");const d=await r.json();setOpp(d.opportunity);setMatch(d.match);const ar=await fetch(`/api/applications`);const ad=await ar.json();setApplied(ad.applications.find((a:Application)=>a.opportunityId===id)||null)}catch(e:any){setErr(e.message)}})()},[id]);
+  const apply=async()=>{if(!opp||opp.applied)return;setApplying(true);setErr(null);try{const r=await fetch("/api/apply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({opportunityId:opp.id})});if(!r.ok)throw new Error("failed");const d=await r.json();setApplied(d.application);setOpp({...opp,applied:true});setFire(true)}catch(e:any){setErr(e.message)}finally{setApplying(false)}};
+  if(err)return(<div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 text-center"><p className="text-red-600 mb-4">{err==="not found"?(hi?"अवसर नहीं मिला।":"Opportunity not found."):err}</p><Link href="/opportunities" className="btn-primary inline-flex items-center gap-1"><ArrowLeft size={16}/>{hi?"सभी अवसर":"All opportunities"}</Link></div>);
+  if(!opp)return(<div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 text-center text-gray-500"><Loader2 className="animate-spin mx-auto mb-3"/>Loading…</div>);
+  const scoreColor=match&&match.score>=80?"text-setu-600 bg-setu-50 border-setu-200":match&&match.score>=60?"text-orange-600 bg-orange-50 border-orange-200":"text-gray-600 bg-gray-50 border-gray-200";
+  const typeLabel={JOB:hi?"नौकरी":"Job",SCHEME:hi?"सरकारी योजना":"Govt Scheme",INTERNSHIP:hi?"इंटर्नशिप":"Internship",SKILLING:hi?"कौशल पाठ्यक्रम":"Skilling course",FELLOWSHIP:hi?"फेलोशिप":"Fellowship"}[opp.type];
+  return(<><Confetti fire={fire}/><div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+    <Link href="/opportunities" className="btn-secondary mb-4 inline-flex items-center gap-1 text-sm"><ArrowLeft size={14}/>{hi?"सभी अवसर":"All opportunities"}</Link>
+    <div className="card">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div><div className="flex items-center gap-2 mb-1"><span className="chip chip-setu">{typeLabel}</span><span className="chip chip-gray">{opp.source}</span></div><h1 className="text-2xl font-extrabold text-ink-900">{opp.title}</h1><p className="text-gray-600 mt-1 flex items-center gap-1"><Building2 size={14}/>{opp.employer}</p></div>
+        {match&&<div className={clsx("text-center border rounded-xl px-4 py-2 min-w-[90px]",scoreColor)}><div className="text-2xl font-extrabold">{match.score}%</div><div className="text-[11px] uppercase tracking-wide">{hi?"मैच":"match"}</div></div>}
       </div>
-    );
-  }
-
-  const score = appliedResult?.score ?? match?.score ?? 0;
-
-  return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-      <Link href="/opportunities" className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-setu-700 mb-6">
-        <ArrowLeft size={16}/> {t.back}
-      </Link>
-
-      <div className="card p-6 sm:p-8">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <span className="chip chip-green">{t.typeLabels[opp.type]}</span>
-              {opp.workMode === "REMOTE" && <span className="chip chip-blue">{t.remote}</span>}
-              {opp.workMode === "HYBRID" && <span className="chip chip-green">{t.hybrid}</span>}
-              {opp.workMode === "ON_SITE" && <span className="chip chip-gray">{t.onSite}</span>}
-              {opp.experienceLevel === "FRESHER" && <span className="chip chip-green">{lang === "hi" ? "फ्रेशर" : "Fresher"}</span>}
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-ink-900">
-              {pickLocalized(opp, "title", lang)}
-            </h1>
-            <div className="flex flex-wrap items-center gap-4 mt-2 text-gray-600">
-              <span className="flex items-center gap-1"><Building2 size={16}/> {pickLocalized(opp, "company", lang)}</span>
-              <span className="flex items-center gap-1"><MapPin size={16}/> {pickLocalized(opp, "location", lang)}</span>
-              {(opp.salaryLabel || opp.stipend) && (
-                <span className="font-semibold text-gray-800">
-                  {pickLocalized(opp, "salaryLabel", lang) || opp.stipend}
-                </span>
-              )}
-              {opp.duration && <span className="text-sm">{opp.duration}</span>}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleSave} className="btn-secondary flex items-center gap-1.5 text-sm">
-              {opp.saved ? <BookmarkCheck size={16} className="text-setu-600"/> : <BookmarkPlus size={16}/>}
-              {opp.saved ? t.saved : t.save}
-            </button>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-4 mt-6">
-          <div className="md:col-span-2 space-y-5">
-            <section>
-              <h2 className="text-lg font-bold text-ink-900 mb-2 flex items-center gap-2">
-                <Target size={18} className="text-setu-600"/> {t.aboutRole}
-              </h2>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                {pickLocalized(opp, "description", lang)}
-              </p>
-            </section>
-
-            {(opp.eligibility || opp.eligibilityHi) && (
-              <section>
-                <h2 className="text-lg font-bold text-ink-900 mb-2 flex items-center gap-2">
-                  <CheckCircle2 size={18} className="text-setu-600"/> {t.eligibility}
-                </h2>
-                <p className="text-gray-700 whitespace-pre-line">{pickLocalized(opp, "eligibility", lang)}</p>
-              </section>
-            )}
-
-            <section>
-              <h2 className="text-lg font-bold text-ink-900 mb-2 flex items-center gap-2">
-                <Sparkles size={18} className="text-setu-600"/> {t.requirements}
-              </h2>
-              <p className="text-gray-700 whitespace-pre-line">{pickLocalized(opp, "requirements", lang)}</p>
-            </section>
-
-            {opp.skills.length > 0 && (
-              <section>
-                <h2 className="text-lg font-bold text-ink-900 mb-2 flex items-center gap-2">
-                  <Sparkles size={18} className="text-setu-600"/> {t.skills}
-                </h2>
-                <div className="flex flex-wrap gap-1.5">
-                  {opp.skills.map((s) => {
-                    const has = match?.strengths?.some((x) => x.toLowerCase() === s.toLowerCase()) || match?.strengths?.some((x) => s.toLowerCase().includes(x.toLowerCase()) || x.toLowerCase().includes(s.toLowerCase()));
-                    return (
-                      <span key={s} className={`chip ${has ? "chip-green" : ""}`}>{s}</span>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-          </div>
-
-          <aside className="space-y-4">
-            <div className="card p-4 bg-setu-50/50 !border-setu-100">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 text-setu-700 font-semibold text-sm"><Sparkles size={14}/>{t.matchScore}</div>
-                <div className="text-xl font-extrabold text-setu-700">{score}%</div>
-              </div>
-              <div className="w-full h-2 bg-white rounded-full overflow-hidden border border-setu-100">
-                <div className="h-full bg-gradient-to-r from-setu-500 to-saffron-500" style={{ width: `${score}%` }}/>
-              </div>
-              {match && match.reasons.length > 0 && (
-                <ul className="mt-3 space-y-1.5 text-sm">
-                  {match.reasons.slice(0, 3).map((r, i) => (
-                    <li key={i} className="flex gap-2 text-gray-700">
-                      <CheckCircle2 size={16} className="text-setu-600 shrink-0 mt-0.5"/> <span>{r}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {match && match.skillGaps.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
-                    <Lightbulb size={14}/>{t.skillGaps}
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {match.skillGaps.slice(0, 4).map((s) => (
-                      <span key={s} className="chip chip-orange">{s}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={handleApply}
-              disabled={applying || !!opp.applied}
-              className="btn-primary w-full flex items-center justify-center gap-2"
-            >
-              {opp.applied ? (
-                <><CheckCircle2 size={16}/> {lang === "hi" ? "आवेदन हो चुका" : "Applied"}</>
-              ) : (
-                <><ExternalLink size={16}/> {t.applyNow}</>
-              )}
-            </button>
-            {opp.applyUrl && (
-              <a href={opp.applyUrl} target="_blank" rel="noreferrer" className="btn-secondary w-full flex items-center justify-center gap-2">
-                <ExternalLink size={16}/> {t.applyExternal}
-              </a>
-            )}
-            {opp.contactEmail && (
-              <p className="text-xs text-gray-500 text-center">
-                {lang === "hi" ? "संपर्क:" : "Contact:"} <a className="underline" href={`mailto:${opp.contactEmail}`}>{opp.contactEmail}</a>
-              </p>
-            )}
-
-            {appliedResult?.feedback && (
-              <div className="card p-4 border-setu-200 bg-setu-50/40">
-                <div className="flex items-center gap-1.5 text-setu-700 font-semibold text-sm mb-1">
-                  <Sparkles size={14}/> {t.aiFeedback}
-                </div>
-                <p className="text-sm text-gray-700">{appliedResult.feedback}</p>
-              </div>
-            )}
-
-            {eligibility && (
-              <div className={`card p-4 ${eligibility.eligible ? "!border-setu-200 !bg-setu-50/40" : "!border-orange-200 !bg-orange-50/50"}`}>
-                <div className="flex items-center gap-1.5 font-semibold text-sm mb-2">
-                  <ShieldCheck size={16} className={eligibility.eligible ? "text-setu-700" : "text-orange-700"}/>
-                  <span className={eligibility.eligible ? "text-setu-700" : "text-orange-700"}>
-                    {lang === "hi" ? "पात्रता जाँच" : "Eligibility check"}: {statusLabel(eligibility.status, lang)}
-                  </span>
-                </div>
-                <ul className="space-y-1 text-sm text-gray-700">
-                  {eligibility.reasons.map((r, i) => (
-                    <li key={i} className="flex gap-2">
-                      {r.ok ? (
-                        <CheckCircle2 size={14} className="text-setu-600 shrink-0 mt-0.5"/>
-                      ) : (
-                        <Lightbulb size={14} className="text-orange-600 shrink-0 mt-0.5"/>
-                      )}
-                      <span>{r.text}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-[11px] text-gray-500 mt-2">
-                  {lang === "hi"
-                    ? "यह एक स्वचालित प्रारंभिक जाँच है। आवेदन से पहले आधिकारिक पोर्टल पर अवश्य सत्यापित करें।"
-                    : "This is an automated initial check. Please verify on the official portal before applying."}
-                </p>
-              </div>
-            )}
-          </aside>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm text-gray-600 mb-5"><span className="inline-flex items-center gap-1.5"><MapPin size={14}/>{opp.location}</span>{opp.salary&&<span className="inline-flex items-center gap-1.5"><Briefcase size={14}/>{opp.salary}</span>}<span className="inline-flex items-center gap-1.5"><Calendar size={14}/>{hi?"अंतिम तिथि":"Deadline"}: {new Date(opp.deadline).toLocaleDateString(lang==="hi"?"hi-IN":"en-IN")}</span>{opp.qualification&&<span className="inline-flex items-center gap-1.5"><GraduationCap size={14}/>{opp.qualification}</span>}</div>
+      <p className="text-ink-800 leading-relaxed mb-4">{opp.description}</p>
+      <div className="mb-4"><h3 className="text-sm font-semibold text-ink-900 mb-2">{hi:"आवश्यक स्किल्स":"Skills required"}</h3><div className="flex flex-wrap gap-1.5">{opp.skills.map(s=>{const has=match?.matchedSkills.some(ms=>ms.toLowerCase()===s.toLowerCase());return<span key={s} className={clsx("chip",has?"chip-green":"chip-gray")}>{has&&"✓ "}{s}</span>})}</div></div>
+      {match&&match.missingSkills.length>0&&(<div className="mb-4 bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm"><div className="font-semibold text-orange-800 mb-1">{hi:"स्किल गैप (पहले इन्हें सीखें)":"Skill gaps to build first:"}</div><div className="flex flex-wrap gap-1.5">{match.missingSkills.map(s=><span key={s} className="chip chip-orange">{s}</span>)}</div></div>)}
+      {match&&match.reasons.length>0&&(<div className="mb-4"><h3 className="text-sm font-semibold text-ink-900 mb-2 flex items-center gap-1"><Sparkles size={14} className="text-setu-600"/>{hi:"यह क्यों मेल खाता है":"Why this matches"}</h3><ul className="space-y-1.5 text-sm">{match.reasons.map((r,i)=><li key={i} className="flex items-start gap-2 text-ink-800"><ThumbsUp size={14} className="text-setu-600 mt-0.5 shrink-0"/>{r}</li>)}</ul></div>}
+      {opp.link&&<div className="mb-4"><p className="text-xs text-gray-500 mb-1">{hi:"आधिकारिक लिंक":"Official link"}</p><a href={opp.link} target="_blank" rel="noreferrer" className="text-setu-700 underline text-sm break-all">{opp.link}</a></div>}
+      <div className="pt-4 border-t border-gray-100 flex flex-wrap items-center gap-3">
+        <button onClick={apply} disabled={applying||!!opp.applied} className={clsx("btn-primary",(applying||!!opp.applied)&&"opacity-60 cursor-not-allowed")}>{opp.applied?(<><CheckCircle2 size={16}/>{hi:"आवेदन हो गया ✓":"Applied ✓"}</>):applying?(<><Loader2 size={16} className="animate-spin"/>{hi:"भेज रहे हैं…":"Applying…"}</>):(<><Sparkles size={16}/>{hi:"AI के साथ आवेदन करें":"Apply with AI"}</>)}</button>
+        <Link href="/chat" className="btn-secondary">{hi?"सेतु मित्र से पूछें":"Ask Setu Mitra"}</Link>
+        <ShareButtons title={`${opp.title} — ${opp.employer} | Setu AI`}/>
       </div>
+      {err&&<p className="text-red-600 text-sm mt-3">{err}</p>}
+      {applied&&<div className="mt-4 card !bg-setu-50 !border-setu-200"><div className="flex items-start gap-2"><ThumbsUp size={18} className="text-setu-700 shrink-0 mt-0.5"/><div><p className="font-semibold text-setu-800">{hi:"आवेदन सफल! (AI फीडबैक)":"Application submitted! (AI feedback)"}</p><p className="text-sm text-ink-800 mt-1">{applied.feedback}</p><p className="text-xs text-gray-500 mt-1">{hi:"AI स्कोर":"AI score"}: {applied.aiScore}%</p></div></div></div>}
     </div>
-  );
+  </div></>);
 }

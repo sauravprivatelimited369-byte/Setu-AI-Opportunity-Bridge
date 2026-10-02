@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://setu-ai-bridge.vercel.app/sitemap.xml
