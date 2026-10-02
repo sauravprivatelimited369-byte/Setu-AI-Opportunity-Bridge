@@ -1,0 +1,46 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import AppShell from "@/components/AppShell";
+
+export const metadata: Metadata = {
+  metadataBase: new URL("https://setu-ai.example.com"),
+  title: {
+    default: "Setu AI Opportunity Bridge — Find the right opportunity in your language",
+    template: "%s · Setu AI",
+  },
+  description:
+    "AI-powered bridge between Indian job seekers, students and the right opportunity — jobs, internships, scholarships, government schemes, and free skilling courses across Bharat. हिंदी में भी उपलब्ध।",
+  keywords: [
+    "jobs India", "sarkari naukri", "government schemes", "scholarships India", "PMKVY",
+    "Mudra loan", "PM SVANidhi", "AI job match", "internships India", "free skilling",
+    "रोजगार", "नौकरी", "सरकारी योजना", "छात्रवृत्ति",
+  ],
+  authors: [{ name: "Setu AI Team" }],
+  openGraph: {
+    type: "website",
+    title: "Setu AI Opportunity Bridge",
+    description:
+      "AI-powered bridge between Indian seekers and opportunities. Jobs, schemes, scholarships, skilling — in your language.",
+    images: ["/icon.svg"],
+  },
+  twitter: {
+    card: "summary",
+    title: "Setu AI Opportunity Bridge",
+    description: "AI-powered opportunity discovery for Bharat.",
+    images: ["/icon.svg"],
+  },
+  icons: { icon: "/favicon.svg", apple: "/icon.svg" },
+  robots: { index: true, follow: true },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en">
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
+    </html>
+  );
+}
