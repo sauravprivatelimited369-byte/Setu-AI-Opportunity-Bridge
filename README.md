@@ -2,9 +2,19 @@
 
 **AI-powered bridge between Bharat and the right opportunity.**
 
-Setu ("सेतु" meaning *bridge*) is an inclusive, multilingual platform that matches Indian job seekers, students, and workers with **jobs, internships, scholarships, government schemes, skilling courses, and gig work** — powered by AI, available in **English and हिंदी**, and tuned for Bharat.
+Setu ("सेतु" meaning *bridge*) is an inclusive, multilingual platform that matches Indian job seekers, students, and workers with **jobs, internships, scholarships, government schemes, skilling courses, and gig work** — powered by AI, available in **English and हिंदी**, installable as a **phone app (PWA)**, and tuned for Bharat.
 
 ![Setu AI](public/icon.svg)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsauravprivatelimited369-byte%2FSetu-AI-Opportunity-Bridge&project-name=setu-ai-opportunity-bridge&repository-name=Setu-AI-Opportunity-Bridge)
+[![CI](https://github.com/sauravprivatelimited369-byte/Setu-AI-Opportunity-Bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/sauravprivatelimited369-byte/Setu-AI-Opportunity-Bridge/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+## 🚀 Live website + phone app
+
+- **Deploy in 1 click**: Click the **Deploy with Vercel** button above. It will ask you to sign in with GitHub, then Vercel builds and hosts your site for free on a public URL like `https://setu-ai-opportunity-bridge.vercel.app`.
+- **Install as a phone/desktop app**: Open your deployed URL in Chrome/Safari/Edge, tap the **"Install App"** button in the top nav (or the banner that appears on mobile). Setu installs to your home screen, runs full-screen like a native app, and works offline.
+- See [DEPLOY.md](DEPLOY.md) for the one-line Git Bash command to deploy from your terminal.
 
 ## ✨ Features
 
