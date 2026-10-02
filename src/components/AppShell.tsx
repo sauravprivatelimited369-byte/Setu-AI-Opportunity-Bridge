@@ -1,15 +1,41 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bridge, Languages } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bridge, Languages, Smartphone, CheckCircle2 } from "lucide-react";
 import clsx from "clsx";
 import { LangProvider, useLang } from "@/context/LangContext";
 import { useT } from "@/lib/i18n";
+import { canInstallPwa, captureInstallPrompt, isInstalledPwa, promptInstall, registerServiceWorker } from "@/lib/pwa";
+import InstallBanner from "./InstallBanner";
 
 function NavBar() {
   const pathname = usePathname();
   const { lang, toggle } = useLang();
   const t = useT(lang);
+  const [installable, setInstallable] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [installMsg, setInstallMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    registerServiceWorker();
+    captureInstallPrompt();
+    setInstalled(isInstalledPwa());
+    const check = () => setInstallable(canInstallPwa());
+    check();
+    window.addEventListener("setu:pwa-ready", check);
+    window.addEventListener("setu:pwa-installed", () => { setInstalled(true); setInstallable(false); });
+    return () => {
+      window.removeEventListener("setu:pwa-ready", check);
+    };
+  }, []);
+
+  const onInstall = async () => {
+    const res = await promptInstall();
+    if (res === "accepted") setInstallMsg(lang === "hi" ? "ऐप इंस्टॉल हो रहा है ✓" : "Installing app ✓");
+    setInstallable(false);
+    setTimeout(() => setInstallMsg(null), 3000);
+  };
 
   const links = [
     { href: "/", label: t.navHome },
@@ -60,6 +86,19 @@ function NavBar() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {installable && !installed && (
+            <button
+              onClick={onInstall}
+              className="hidden sm:inline-flex btn-secondary !px-3 !py-1.5 items-center gap-1.5 text-sm"
+              title={lang === "hi" ? "फ़ोन/लैपटॉप पर ऐप के रूप में इंस्टॉल करें" : "Install as a phone/laptop app"}
+            >
+              <Smartphone size={16}/>
+              <span>{lang === "hi" ? "ऐप इंस्टॉल" : "Install App"}</span>
+            </button>
+          )}
+          {installed && (
+            <span className="hidden sm:inline-flex chip chip-green items-center gap-1 text-xs"><CheckCircle2 size={12}/> {lang === "hi" ? "ऐप" : "App"}</span>
+          )}
           <button
             onClick={toggle}
             className="btn-secondary !px-3 !py-1.5 flex items-center gap-1.5 text-sm"
@@ -72,6 +111,11 @@ function NavBar() {
             {t.chatCta}
           </Link>
         </div>
+        {installMsg && (
+          <div className="fixed top-20 right-4 z-50 card !bg-setu-600 !text-white !border-setu-700 px-4 py-2 text-sm shadow-xl flex items-center gap-2">
+            <CheckCircle2 size={16}/> {installMsg}
+          </div>
+        )}
       </div>
       {/* Mobile nav */}
       <div className="md:hidden border-t border-gray-100 flex overflow-x-auto scrollbar-thin">
@@ -129,6 +173,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
       <NavBar />
       <main className="flex-1">{children}</main>
       <Footer />
+      <InstallBanner />
     </div>
   );
 }
