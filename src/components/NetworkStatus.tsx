@@ -1,0 +1,5 @@
+"use client";
+import { useEffect, useState } from "react";
+import { WifiOff, RefreshCw } from "lucide-react";
+import { useLang } from "@/context/LangContext";
+export default function NetworkStatus(){const{lang}=useLang();const[on,setOn]=useState(true);useEffect(()=>{setOn(navigator.onLine);const on2=()=>setOn(true);const off=()=>setOn(false);window.addEventListener("online",on2);window.addEventListener("offline",off);return()=>{window.removeEventListener("online",on2);window.removeEventListener("offline",off)}},[]);if(on)return null;return(<div className="sticky top-16 z-40 bg-orange-50 text-orange-800 border-b border-orange-200 px-4 py-2 text-sm flex items-center gap-2"><WifiOff size={16}/><span>{lang==="hi"?"इंटरनेट नहीं — देखे हुए पृष्ठ ऑफलाइन काम करते हैं।":"You are offline — recent pages work offline."}</span><button onClick={()=>window.location.reload()} className="ml-auto chip chip-orange cursor-pointer flex items-center gap-1"><RefreshCw size={12}/>{lang==="hi"?"रीट्राई":"Retry"}</button></div>);}

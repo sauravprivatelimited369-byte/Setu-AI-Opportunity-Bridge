@@ -1,0 +1,4 @@
+"use client";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+export default function K(){const r=useRouter();useEffect(()=>{let g=false;let t:ReturnType<typeof setTimeout>|null=null;const on=(e:KeyboardEvent)=>{const el=e.target as HTMLElement;if(el&&(el.tagName==="INPUT"||el.tagName==="TEXTAREA"||el.isContentEditable))return;if(e.key==="g"&&!g){g=true;if(t){clearTimeout(t);t=null}t=setTimeout(()=>{g=false},1200);return}if(g){g=false;if(t){clearTimeout(t);t=null}if(e.key==="d")r.push("/dashboard");else if(e.key==="o")r.push("/opportunities");else if(e.key==="m")r.push("/matches");else if(e.key==="c")r.push("/chat");else if(e.key==="p")r.push("/profile");else if(e.key==="a")r.push("/applications");else if(e.key==="s")r.push("/saved");return}if(e.key==="?"){e.preventDefault();r.push("/faq")}};window.addEventListener("keydown",on);return()=>window.removeEventListener("keydown",on)},[r]);return null}
