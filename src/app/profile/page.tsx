@@ -1,170 +1,72 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Save, UserCircle, Briefcase, MapPin, BookOpen, Languages, Sparkles, CheckCircle2 } from "lucide-react";
 import { useLang } from "@/context/LangContext";
 import { useT } from "@/lib/i18n";
-import type { SeekerProfile, OpportunityType } from "@/lib/types";
+import type { SeekerProfile } from "@/lib/types";
 
-const TYPES: { id: OpportunityType; icon: string }[] = [
-  { id: "JOB", icon: "💼" },
-  { id: "INTERNSHIP", icon: "🎓" },
-  { id: "GIG", icon: "🛵" },
-  { id: "SCHOLARSHIP", icon: "📘" },
-  { id: "SCHEME", icon: "🏛️" },
-  { id: "SKILLING", icon: "🧑‍💻" },
-];
+const empty: SeekerProfile = { id: "me", name: "", email: "", phone: "", location: "", currentRole: "", experienceYears: 0, education: "", skills: [], languages: ["English","Hindi"], bio: "", preferredTypes: [], preferredLocation: "" };
 
-export default function ProfilePage() {
+export default function ProfilePage(){
   const { lang } = useLang();
   const t = useT(lang);
-  const tLabels = t.typeLabels;
-  const [form, setForm] = useState<SeekerProfile | null>(null);
-  const [toast, setToast] = useState(false);
+  const hi = lang === "hi";
+  const [p, setP] = useState<SeekerProfile>(empty);
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/profile")
-      .then((r) => r.json())
-      .then((d) => setForm(d.profile));
+    fetch("/api/profile").then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+      .then(d => { setP(d.profile || empty); setLoaded(true); setErr(null); })
+      .catch(e => { setLoaded(true); setErr(String(e)); });
   }, []);
 
-  const update = <K extends keyof SeekerProfile>(k: K, v: SeekerProfile[K]) => {
-    setForm((f) => (f ? { ...f, [k]: v } : f));
-  };
-
-  const toggleType = (tp: OpportunityType) => {
-    if (!form) return;
-    const arr = form.preferredTypes ?? [];
-    const has = arr.includes(tp);
-    update(
-      "preferredTypes",
-      has ? arr.filter((x) => x !== tp) : [...arr, tp]
-    );
-  };
-
-  const onSubmit = async (e: React.FormEvent) => {
+  const upd = (k: keyof SeekerProfile, v: any) => setP(prev => ({ ...prev, [k]: v }));
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form) return;
-    setSaving(true);
-    await fetch("/api/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form }),
-    });
-    setSaving(false);
-    setToast(true);
-    setTimeout(() => setToast(false), 2500);
+    setSaving(true); setErr(null);
+    try {
+      const res = await fetch("/api/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...p, skills: typeof p.skills === "string" ? p.skills : p.skills.join(", "), languages: typeof p.languages === "string" ? p.languages : p.languages.join(", ") }) });
+      if (!res.ok) throw new Error("save failed");
+      const d = await res.json(); setP(d.profile); setSaved(true); setTimeout(() => setSaved(false), 2500);
+    } catch (e: unknown) { setErr((e as Error).message); }
+    finally { setSaving(false); }
   };
 
-  const onReset = async () => {
-    if (!confirm(lang === "hi" ? "डेमो डेटा रीसेट करें?" : "Reset demo data?")) return;
-    await fetch("/api/reset", { method: "POST" }).catch(() => {});
-    window.location.reload();
-  };
-
-  if (!form) {
-    return <div className="max-w-4xl mx-auto p-6">{lang === "hi" ? "लोड हो रहा है…" : "Loading…"}</div>;
-  }
-
+  const label = (en: string, h: string) => hi ? h : en;
+  const field = "w-full input";
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-ink-900">{t.yourProfile}</h1>
-        <p className="text-gray-600 mt-1">{t.profileDesc}</p>
-      </div>
-
-      {toast && (
-        <div className="mb-4 card !border-setu-200 !bg-setu-50 text-setu-800 p-3 flex items-center gap-2">
-          <CheckCircle2 size={18}/> {t.savedToast}
-        </div>
-      )}
-
-      <form onSubmit={onSubmit} className="card p-6 space-y-6">
-        <div className="grid md:grid-cols-2 gap-4">
-          <Field label={lang === "hi" ? "नाम" : "Full name"}>
-            <input className="input" value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Riya Verma"/>
-          </Field>
-          <Field label={lang === "hi" ? "ईमेल" : "Email"}>
-            <input className="input" type="email" value={form.email ?? ""} onChange={(e) => update("email", e.target.value)} placeholder="you@example.com"/>
-          </Field>
-          <Field label={lang === "hi" ? "फ़ोन" : "Phone"}>
-            <input className="input" value={form.phone ?? ""} onChange={(e) => update("phone", e.target.value)} placeholder="+91-..." />
-          </Field>
-          <Field label={lang === "hi" ? "वर्तमान शहर" : "Current city / location"}>
-            <input className="input" value={form.location ?? ""} onChange={(e) => update("location", e.target.value)} placeholder="e.g. Patna, Bihar"/>
-          </Field>
-          <Field label={lang === "hi" ? "वर्तमान भूमिका" : "Current role / headline"}>
-            <input className="input" value={form.currentRole ?? ""} onChange={(e) => update("currentRole", e.target.value)} placeholder="Aspiring web developer"/>
-          </Field>
-          <Field label={lang === "hi" ? "अनुभव (वर्ष)" : "Years of experience"}>
-            <input className="input" type="number" min={0} max={40} value={form.experienceYears} onChange={(e) => update("experienceYears", Number(e.target.value))}/>
-          </Field>
-          <Field label={lang === "hi" ? "शिक्षा" : "Education"}>
-            <input className="input" value={form.education ?? ""} onChange={(e) => update("education", e.target.value)} placeholder="B.A., B.Sc., 12th pass, ITI…"/>
-          </Field>
-          <Field label={lang === "hi" ? "भाषाएँ" : "Languages you speak"}>
-            <input className="input" value={(form.languages ?? []).join(", ")} onChange={(e) => update("languages", e.target.value.split(",").map(s => s.trim()).filter(Boolean))} placeholder="Hindi, English, Tamil"/>
-          </Field>
-        </div>
-
-        <Field label={lang === "hi" ? "आपके स्किल्स" : "Your skills (comma-separated)"}>
-          <input
-            className="input"
-            value={form.skills.join(", ")}
-            onChange={(e) => update("skills", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-            placeholder="React, Hindi, Communication, Sales, Tailwind CSS…"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            {lang === "hi"
-              ? "सुझाव: तकनीकी स्किल्स (React, SQL, Excel), सॉफ्ट स्किल्स (संचार, बिक्री), और भाषाएँ शामिल करें।"
-              : "Tip: include technical skills (React, SQL, Excel), soft skills (communication, sales), and languages."}
-          </p>
-        </Field>
-
-        <Field label={lang === "hi" ? "संक्षिप्त परिचय" : "Short bio"}>
-          <textarea className="input min-h-[88px]" value={form.bio ?? ""} onChange={(e) => update("bio", e.target.value)} placeholder={lang === "hi" ? "अपने बारे में 2–3 पंक्तियाँ…" : "2–3 lines about yourself and your goals…"}/>
-        </Field>
-
-        <Field label={lang === "hi" ? "अवसर के प्रकार जो आप चाहते हैं" : "Opportunity types you're interested in"}>
-          <div className="flex flex-wrap gap-2">
-            {TYPES.map((t) => {
-              const active = (form.preferredTypes ?? []).includes(t.id);
-              return (
-                <button
-                  type="button"
-                  key={t.id}
-                  onClick={() => toggleType(t.id)}
-                  className={`px-3 py-1.5 rounded-full border text-sm font-medium transition flex items-center gap-1.5 ${
-                    active
-                      ? "bg-setu-600 text-white border-setu-600"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-setu-400"
-                  }`}
-                >
-                  <span>{t.icon}</span> {tLabels[t.id]}
-                </button>
-              );
-            })}
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+      <Link href="/dashboard" className="btn-secondary mb-4 inline-flex items-center gap-1 text-sm"><ArrowLeft size={14}/>{label("Back to dashboard", "डैशबोर्ड पर वापस")}</Link>
+      <div className="card">
+        <h1 className="text-2xl font-extrabold text-ink-900 mb-1 flex items-center gap-2"><UserCircle size={22} className="text-setu-600"/>{label("My Profile", "मेरी प्रोफ़ाइल")}</h1>
+        <p className="text-sm text-gray-500 mb-5">{label("Fill in your details for better AI matches.", "बेहतर AI मैच के लिए अपना विवरण भरें।")}</p>
+        {err && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{err}</div>}
+        {!loaded ? <p className="text-gray-500 text-sm py-4">Loading…</p> : (
+        <form onSubmit={save} className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div><label className="label"><UserCircle size={13}/>{label("Full name", "पूरा नाम")}</label><input className={field} value={p.name} onChange={e => upd("name", e.target.value)} placeholder={label("Your name", "आपका नाम")}/></div>
+            <div><label className="label"><Briefcase size={13}/>{label("Current role / goal", "वर्तमान भूमिका / लक्ष्य")}</label><input className={field} value={p.currentRole} onChange={e => upd("currentRole", e.target.value)} placeholder={label("e.g. Fresher, Web developer", "जैसे: फ्रेशर, वेब डेवलपर")}/></div>
+            <div><label className="label"><MapPin size={13}/>{label("Location", "स्थान")}</label><input className={field} value={p.location} onChange={e => upd("location", e.target.value)} placeholder={label("City, State", "शहर, राज्य")}/></div>
+            <div><label className="label">📞 {label("Phone", "फ़ोन")}</label><input className={field} value={p.phone} onChange={e => upd("phone", e.target.value)} placeholder="+91-..."/></div>
+            <div><label className="label">✉ {label("Email", "ईमेल")}</label><input className={field} type="email" value={p.email} onChange={e => upd("email", e.target.value)} placeholder="you@example.com"/></div>
+            <div><label className="label"><BookOpen size={13}/>{label("Education", "शिक्षा")}</label><input className={field} value={p.education} onChange={e => upd("education", e.target.value)} placeholder={label("e.g. B.A. 2nd year", "जैसे: B.A. द्वितीय वर्ष")}/></div>
+            <div><label className="label">⏳ {label("Experience (years)", "अनुभव (वर्ष)")}</label><input className={field} type="number" min={0} max={50} value={p.experienceYears} onChange={e => upd("experienceYears", Math.max(0, Number(e.target.value)||0))}/></div>
+            <div><label className="label"><Languages size={13}/>{label("Languages", "भाषाएँ")}</label><input className={field} value={Array.isArray(p.languages) ? p.languages.join(", ") : p.languages} onChange={e => upd("languages", e.target.value.split(",").map(s=>s.trim()).filter(Boolean))} placeholder={label("English, Hindi", "हिंदी, अंग्रेज़ी")}/></div>
           </div>
-        </Field>
-
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-          <button type="button" onClick={onReset} className="text-sm text-gray-500 hover:text-gray-700 inline-flex items-center gap-1">
-            <RotateCcw size={14}/> {t.resetDb}
-          </button>
-          <button type="submit" disabled={saving} className="btn-primary inline-flex items-center gap-2">
-            <Save size={16}/> {t.saveChanges}
-          </button>
-        </div>
-      </form>
+          <div><label className="label">🛠 {label("Skills (comma separated)", "स्किल्स (अल्पविराम से अलग)")}</label><input className={field} value={Array.isArray(p.skills) ? p.skills.join(", ") : p.skills} onChange={e => upd("skills", e.target.value.split(",").map(s=>s.trim()).filter(Boolean))} placeholder={label("e.g. React, Tailwind, Excel", "जैसे: React, Tailwind, Excel")}/></div>
+          <div><label className="label">💬 {label("Short bio", "संक्षिप्त परिचय")}</label><textarea className={field + " min-h-[80px]"} value={p.bio} onChange={e => upd("bio", e.target.value)} placeholder={label("A line or two about you…", "अपने बारे में एक-दो पंक्तियाँ…")}/></div>
+          <div className="flex items-center gap-3 pt-2">
+            <button type="submit" disabled={saving} className="btn-primary inline-flex items-center gap-2"><Save size={16}/>{saving ? label("Saving…", "सहेज रहे हैं…") : label("Save profile", "प्रोफ़ाइल सहेजें")}</button>
+            {saved && <span className="text-setu-700 text-sm inline-flex items-center gap-1"><CheckCircle2 size={16}/>{label("Saved!", "सहेजा गया!")}</span>}
+          </div>
+          <p className="text-xs text-gray-400 pt-1 flex items-center gap-1"><Sparkles size={12}/>{label("Better profile → smarter matches.", "बेहतर प्रोफ़ाइल → बेहतर सुझाव।")}</p>
+        </form>
+        )}
+      </div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="text-sm font-semibold text-gray-700 mb-1 block">{label}</span>
-      {children}
-    </label>
   );
 }

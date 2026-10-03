@@ -6,6 +6,8 @@ import type { Application, ChatMessage, Opportunity, SavedOpportunity } from "./
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
+const TMP_DIR = process.env.VERCEL ? "/tmp" : DATA_DIR;
+const TMP_FILE = path.join(TMP_DIR, "db.json");
 
 type DbShape = {
   opportunities: Opportunity[];
@@ -35,223 +37,147 @@ function defaultSeeker(): SeekerProfile {
 
 function seed(): DbShape {
   return {
-    opportunities: seedOpportunities.map((o) => ({
-      ...o,
-      saved: false,
-      applied: false,
-    })),
-    seeker: {
-      ...defaultSeeker(),
-      // demo prefilled profile so matching works out of the box
-      name: "Aarav Sharma",
-      email: "aarav.sharma@example.com",
-      phone: "+91-98xxxxxxxx",
-      location: "Bengaluru, Karnataka",
-      currentRole: "Aspiring Frontend Developer",
-      experienceYears: 1,
-      education: "B.Tech, Computer Science (2024)",
-      skills: ["React", "JavaScript", "HTML", "CSS", "TypeScript", "Git", "Python"],
-      languages: ["English", "Hindi"],
-      bio: "Passionate about building clean, accessible web experiences. Open to remote and hybrid roles across India.",
-      preferredTypes: ["JOB", "INTERNSHIP"],
-      preferredLocation: "Bengaluru",
-    },
+    opportunities: seedOpportunities.map((o) => ({ ...o, saved: false, applied: false })),
+    seeker: defaultSeeker(),
     applications: [],
     saved: [],
     messages: [],
   };
 }
 
-function ensure(): DbShape {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(DB_FILE)) {
-    const data = seed();
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
-    return data;
-  }
+// In-memory fallback used when filesystem is read-only (e.g., Vercel serverless)
+let memoryDb: DbShape | null = null;
+let fsAvailable: boolean | null = null;
+
+function canUseFs(): boolean {
+  if (fsAvailable !== null) return fsAvailable;
   try {
-    const raw = fs.readFileSync(DB_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as DbShape;
-    // re-seed opportunities if empty (e.g. after file wiped)
-    if (!parsed.opportunities || parsed.opportunities.length === 0) {
-      parsed.opportunities = seed().opportunities;
-    }
-    if (!parsed.seeker) parsed.seeker = defaultSeeker();
-    if (!parsed.applications) parsed.applications = [];
-    if (!parsed.saved) parsed.saved = [];
-    if (!parsed.messages) parsed.messages = [];
-    return parsed;
+    const dir = process.env.VERCEL ? TMP_DIR : DATA_DIR;
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const testFile = path.join(dir, ".write-test");
+    fs.writeFileSync(testFile, "ok", "utf-8");
+    fs.unlinkSync(testFile);
+    fsAvailable = true;
   } catch {
-    const data = seed();
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
-    return data;
+    fsAvailable = false;
   }
+  return fsAvailable;
 }
 
-let cached: DbShape | null = null;
-function read(): DbShape {
-  if (!cached) cached = ensure();
-  return cached;
+function readFile(p: string): string | null {
+  try { return fs.readFileSync(p, "utf-8"); } catch { return null; }
 }
-function write(db: DbShape) {
-  cached = db;
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
+function writeFile(p: string, data: string): boolean {
+  try { fs.writeFileSync(p, data, "utf-8"); return true; } catch { return false; }
 }
 
-export function resetDb() {
-  write(seed());
+function ensure(): DbShape {
+  if (memoryDb) return memoryDb;
+  const tryPaths = canUseFs() ? [TMP_FILE, DB_FILE] : [];
+  for (const fp of tryPaths) {
+    const raw = readFile(fp);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as DbShape;
+        if (parsed.opportunities?.length) {
+          if (!parsed.seeker) parsed.seeker = defaultSeeker();
+          if (!parsed.applications) parsed.applications = [];
+          if (!parsed.saved) parsed.saved = [];
+          if (!parsed.messages) parsed.messages = [];
+          memoryDb = parsed;
+          return parsed;
+        }
+      } catch { /* corrupt */ }
+    }
+  }
+  memoryDb = seed();
+  if (canUseFs()) writeFile(TMP_FILE, JSON.stringify(memoryDb, null, 2));
+  return memoryDb;
 }
+
+function read(): DbShape { return ensure(); }
+
+function persist(db: DbShape) {
+  memoryDb = db;
+  if (canUseFs()) { writeFile(TMP_FILE, JSON.stringify(db, null, 2)); }
+}
+
+export function resetDb() { persist(seed()); }
 
 // ---------- Opportunities ----------
-export function getOpportunities(): Opportunity[] {
-  return read().opportunities;
-}
+export function getOpportunities(): Opportunity[] { return read().opportunities; }
 export function getOpportunityById(id: string): Opportunity | undefined {
   return read().opportunities.find((o) => o.id === id);
 }
-export function listOpportunities(filters?: {
-  type?: string;
-  q?: string;
-  location?: string;
-  workMode?: string;
-  experience?: string;
-}): Opportunity[] {
+export function listOpportunities(filters?: { type?: string; q?: string; location?: string; workMode?: string; experience?: string; }): Opportunity[] {
   let list = getOpportunities();
+  const db = read();
+  const appliedSet = new Set(db.applications.map(a => a.opportunityId));
+  const savedSet = new Set(db.saved.map(s => s.opportunityId));
+  list = list.map(o => ({ ...o, applied: appliedSet.has(o.id), saved: savedSet.has(o.id) }));
   if (filters) {
-    if (filters.type && filters.type !== "ALL") {
-      list = list.filter((o) => o.type === filters.type);
-    }
-    if (filters.workMode && filters.workMode !== "ALL") {
-      list = list.filter((o) => o.workMode === filters.workMode);
-    }
-    if (filters.experience && filters.experience !== "ALL") {
-      list = list.filter((o) => o.experienceLevel === filters.experience);
-    }
-    if (filters.location) {
-      const q = filters.location.toLowerCase();
-      list = list.filter((o) => o.location.toLowerCase().includes(q));
-    }
+    if (filters.type && filters.type !== "ALL") list = list.filter((o) => o.type === filters.type);
+    if (filters.workMode && filters.workMode !== "ALL") list = list.filter((o) => o.workMode === filters.workMode);
+    if (filters.experience && filters.experience !== "ALL") list = list.filter((o) => o.experienceLevel === filters.experience);
+    if (filters.location) { const q = filters.location.toLowerCase(); list = list.filter((o) => o.location.toLowerCase().includes(q)); }
     if (filters.q) {
       const q = filters.q.toLowerCase();
-      list = list.filter((o) => {
-        const hay = [
-          o.title,
-          o.company,
-          o.location,
-          o.description,
-          o.skills.join(" "),
-          o.tags.join(" "),
-        ]
-          .join(" ")
-          .toLowerCase();
-        return hay.includes(q);
-      });
+      list = list.filter((o) => [o.title, o.company, o.location, o.description, o.skills.join(" "), o.tags.join(" ")].join(" ").toLowerCase().includes(q));
     }
   }
   return list.sort((a, b) => a.postedDaysAgo - b.postedDaysAgo);
 }
 
 // ---------- Seeker ----------
-export function getSeeker(): SeekerProfile {
-  return read().seeker;
-}
+export function getSeeker(): SeekerProfile { return read().seeker; }
 export function updateSeeker(patch: Partial<SeekerProfile>): SeekerProfile {
   const db = read();
   db.seeker = { ...db.seeker, ...patch, id: "me" };
-  write(db);
+  persist(db);
   return db.seeker;
 }
 
 // ---------- Saved ----------
-export function getSaved(): SavedOpportunity[] {
-  return read().saved;
-}
+export function getSaved(): SavedOpportunity[] { return read().saved; }
 export function toggleSave(opportunityId: string): { saved: boolean } {
   const db = read();
-  const idx = db.saved.findIndex(
-    (s) => s.opportunityId === opportunityId && s.seekerId === "me"
-  );
-  if (idx >= 0) {
-    db.saved.splice(idx, 1);
-    write(db);
-    return { saved: false };
-  }
-  db.saved.push({
-    id: cryptoRandomId(),
-    opportunityId,
-    seekerId: "me",
-    savedAt: new Date().toISOString(),
-  });
-  write(db);
-  return { saved: true };
+  const idx = db.saved.findIndex((s) => s.opportunityId === opportunityId && s.seekerId === "me");
+  if (idx >= 0) { db.saved.splice(idx, 1); persist(db); return { saved: false }; }
+  db.saved.push({ id: cryptoRandomId(), opportunityId, seekerId: "me", savedAt: new Date().toISOString() });
+  persist(db); return { saved: true };
 }
 export function isSaved(opportunityId: string): boolean {
-  return read().saved.some(
-    (s) => s.opportunityId === opportunityId && s.seekerId === "me"
-  );
+  return read().saved.some((s) => s.opportunityId === opportunityId && s.seekerId === "me");
 }
 
 // ---------- Applications ----------
-export function getApplications(): Application[] {
-  return read().applications;
-}
-export function applyToOpportunity(
-  opportunityId: string,
-  ai: { score: number; feedback: string }
-): Application {
+export function getApplications(): Application[] { return read().applications; }
+export function applyToOpportunity(opportunityId: string, ai: { score: number; feedback: string }): Application {
   const db = read();
-  const existing = db.applications.find(
-    (a) => a.opportunityId === opportunityId && a.seekerId === "me"
-  );
+  const existing = db.applications.find((a) => a.opportunityId === opportunityId && a.seekerId === "me");
   if (existing) return existing;
-  const app: Application = {
-    id: cryptoRandomId(),
-    opportunityId,
-    seekerId: "me",
-    status: "applied",
-    aiScore: ai.score,
-    aiFeedback: ai.feedback,
-    appliedAt: new Date().toISOString(),
-  };
+  const app: Application = { id: cryptoRandomId(), opportunityId, seekerId: "me", status: "applied", aiScore: ai.score, aiFeedback: ai.feedback, appliedAt: new Date().toISOString() };
   db.applications.push(app);
-  write(db);
+  // also mark opportunity as applied
+  const opp = db.opportunities.find(o => o.id === opportunityId);
+  if (opp) opp.applied = true;
+  persist(db);
   return app;
 }
 export function hasApplied(opportunityId: string): boolean {
-  return read().applications.some(
-    (a) => a.opportunityId === opportunityId && a.seekerId === "me"
-  );
+  return read().applications.some((a) => a.opportunityId === opportunityId && a.seekerId === "me");
 }
 
 // ---------- Chat ----------
 export function getMessages(sessionId: string): ChatMessage[] {
-  return read()
-    .messages.filter((m) => m.sessionId === sessionId)
-    .sort(
-      (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+  return read().messages.filter((m) => m.sessionId === sessionId).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
-export function addMessage(
-  sessionId: string,
-  role: "user" | "assistant",
-  content: string
-): ChatMessage {
+export function addMessage(sessionId: string, role: "user" | "assistant", content: string): ChatMessage {
   const db = read();
-  const msg: ChatMessage = {
-    id: cryptoRandomId(),
-    sessionId,
-    role,
-    content,
-    createdAt: new Date().toISOString(),
-  };
+  const msg: ChatMessage = { id: cryptoRandomId(), sessionId, role, content, createdAt: new Date().toISOString() };
   db.messages.push(msg);
-  write(db);
+  persist(db);
   return msg;
 }
 
-function cryptoRandomId() {
-  return (
-    Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-  );
-}
+function cryptoRandomId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
